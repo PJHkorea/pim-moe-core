@@ -9,8 +9,30 @@ from test_e2e_pinn_moe import mock_e2e_core_pipeline_factory
 
 def compile_and_dump_pure_hlo_asm(bucket_size: int, tokens_per_expert: int, mesh: Mesh) -> str:
     """XLA HLO IR 어셈블리 텍스트 사출 엔진 (물리 VRAM 점유 0MB)"""
-    # ... (생략) ...
+    
+    # 1. 물리 메모리 점유 방지를 위한 가상 Abstract Shape 정의
+    abstract_token_stream = jax.ShapeDtypeStruct(
+        shape=(bucket_size, FEATURE_DIM), dtype=jnp.float32)
+    abstract_gate_logits = jax.ShapeDtypeStruct(
+        shape=(bucket_size, NUM_EXPERTS), dtype=jnp.float32)
+
+    # 2. MoE 커널 팩토리 점화
+    hardware_pass_kernel = mock_e2e_core_pipeline_factory(
+        bucket_size=bucket_size, tokens_per_expert=tokens_per_expert)
+
+    # 3. JIT Lowering 및 HLO 텍스트 사출 (AOT Compilation)
+    with mesh:
+        # 하드웨어 최적화 그래프 형식으로 정적 변환
+        lowered_hlo_graph = jax.jit(hardware_pass_kernel).lower(
+            abstract_token_stream, abstract_gate_logits)
+        
+        # 컴파일 및 어셈블리 텍스트로 변환
+        compiled_executable = lowered_hlo_graph.compile()
+
     return compiled_executable.as_text()
+
+    
+   
 def compile_and_dump_pure_hlo_asm(bucket_size: int, tokens_per_expert: int, mesh: Mesh) -> str:
     """
     [XLA HLO IR ASSEMBLY TEXT EMITTER]
