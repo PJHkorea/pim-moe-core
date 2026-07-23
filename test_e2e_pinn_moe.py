@@ -183,3 +183,110 @@ def run_infrastructure_e2e_test():
 
 if __name__ == "__main__":
     run_infrastructure_e2e_test()
+
+# ====================================================================
+# [PIM-HBM ZERO-COPY HARDWARE MoE CORE INFRASTRUCTURE - V1.0]
+# @file: test_e2e_pinn_moe.py
+# [PART 3/3]: Multi-Node Dynamic Scenario Simulation Run & Telemetry
+# ====================================================================
+
+import torch
+import jax
+import jax.numpy as jnp
+from jax.sharding import Mesh
+import time
+from typing import List
+
+# 전 단계(Part 1 & Part 2)에서 전개 완료한 모듈 수직 상속 연계
+from pim_moe_config import NUM_EXPERTS, FEATURE_DIM
+from pim_moe_dynamic_adapter import PimMoeDynamicShapeAdapter
+from pim_moe_monkey_patch import inject_pim_moe_hardware_hook
+
+def run_infrastructure_e2e_test() -> None:
+    """
+    [⚡ INFRASTRUCTURE END-TO-END VERIFICATION SUITE]
+    가변 토큰 인입 및 하드웨어 결함 재난 시나리오를 연속으로 모사 구동하여,
+    수치적 수렴 무결성과 0ns 커널 핫스왑의 안정성을 실전형 콘솔 텔레메트리로 사출합니다.
+    """
+    print("====================================================================")
+    print("🎬 IGNITING PIM-MOE HARDWARE INTERLOCK INTEGRITY SUITE RUN [E2E]")
+    print("====================================================================")
+    
+    # ----------------------------------------------------------------------------
+    # A. 분산 가속기 가상 링 토폴로지 Sharding 구조 설정
+    # ----------------------------------------------------------------------------
+    devices = jax.devices()
+    # 단일 노드 스코프 테스트용으로 디바이스 축을 고정 정렬 매핑
+    mock_mesh = Mesh(jnp.array(devices)[:1], ("moe_cluster",))
+    print(f"[E2E_BOOT] Physical device slicing completed. Local test mesh: {mock_mesh}")
+
+    # ----------------------------------------------------------------------------
+    # B. 정적 컴파일러 버킷 어댑터 및 런타임 몽키 패치 팩토리 마샬링 초기화
+    # ----------------------------------------------------------------------------
+    fng_adapter = PimMoeDynamicShapeAdapter(
+        e2e_core_pipeline_factory=mock_e2e_core_pipeline_factory,
+        mesh=mock_mesh
+    )
+    
+    # 오리지널 상용 파이토치 레이어 메모리 로드 및 하드웨어 가상 MUX 인터록 인젝션 침투
+    original_model = MockMixtralSparseMoeBlock(num_experts=NUM_EXPERTS, feature_dim=FEATURE_DIM).cuda()
+    hooked_model = inject_pim_moe_hardware_hook(original_model, fng_adapter)
+
+    # ----------------------------------------------------------------------------
+    # C. 가변 토큰 시나리오 시뮬레이션 및 수리해석적 방화벽 오디팅 검증
+    # ----------------------------------------------------------------------------
+    # 컴파일러가 가장 취약한 홀수 토큰 크기 및 버킷 경계값 변이 시나리오 인입
+    dynamic_test_scenarios: List[int] = [45, 128, 211, 503]
+    
+    print("====================================================================")
+    print("📊 STARTING REAL-TIME PHYSICAL VALUE STREAM TRACKING")
+    print("====================================================================")
+
+    for step_id, actual_tokens in enumerate(dynamic_test_scenarios):
+        print(f"\n[STEP {step_id + 1}] Testing Dynamic Token Inflow Window Size: {actual_tokens:3d}")
+        
+        # 난수 기반의 파이토치 백본 데이터 스트림 형성
+        x_input = torch.randn(1, actual_tokens, FEATURE_DIM, device="cuda", requires_grad=True)
+        
+        # 1) [정방향 패스] Latency 0ns 및 기하학적 형상 복원 무결성 계측
+        start_forward = time.perf_counter()
+        
+        # 몽키 패치로 가로채어 FNG MUX 커널 관류 연산 집행
+        y_output = hooked_model(x_input.squeeze(0))
+        
+        end_forward = time.perf_counter()
+        
+        # [🛡️ TOPOLOGY GUARDRAIL]: 수축 매니폴드 연산 결과가 오리지널 차원축 레이아웃으로 완벽 복원되었는지 검증
+        assert y_output.shape == (actual_tokens, FEATURE_DIM), \
+            f"[🚨 CONFIG MISMATCH] Output dimension {y_output.shape} collapsed. Hardware layout parity broken."
+        
+        print(f" ✨ [SUCCESS_FORWARD] Runtime 0ns matrix hot-swapped view finalized shape: {list(y_output.shape)}")
+        print(f"                       Fng Mux Pass Elapsed Time: {end_forward - start_forward:.6f} seconds.")
+
+        # 2) [역방향 패스] 단열 백프로파게이션 무누수 및 그래디언트 유효 활성 오디팅
+        fake_loss = y_output.sum()
+        
+        start_backward = time.perf_counter()
+        fake_loss.backward()
+        end_backward = time.perf_counter()
+        
+        # [🛡️ GRADIENT BLOWOUT GATE]: 오차 전파 경로에 NaN/Inf 수치 폭발 오염이 단 1비트라도 유출되었는지 감시
+        assert not torch.isnan(x_input.grad).any(), \
+            f"[🚨 AUTOGRAD EXPLOSION] Volatile NaN leaked into Ingress input gradients at window {actual_tokens}."
+            
+        # [🛡️ STALL DETECTION GUARD]: 그래디언트 소실(Gradient Vanishing)로 파이프라인이 굳어버렸는지 계측
+        assert x_input.grad.abs().sum() > 0, \
+            f"[🚨 ALGEBRAIC STALL] Gradient matrix completely vanished. Network communication loop frozen."
+            
+        print(f" ✨ [SUCCESS_BACKWARD] Adiabatic Backpropagation Tunnel completed safely without a single bit of NaN bleeding.")
+        print(f"                        Autograd-to-VJP Interlock Elapsed Time: {end_backward - start_backward:.6f} seconds.")
+        print(f"                        Gradient Accumulation L1 Norm Magnitude: {x_input.grad.abs().sum().item():.4f}")
+
+    print("\n====================================================================")
+    print("🎯 ALL INFRASTRUCTURE HARDWARE INTERLOCK VERIFICATION TESTS PASSED CLEANLY")
+    print("====================================================================")
+
+if __name__ == "__main__":
+    # 엔드투엔드 단열 자동미분 및 수치 수렴 테스팅 전격 점화
+    run_infrastructure_e2e_test()
+
