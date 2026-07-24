@@ -1,6 +1,6 @@
 # 🚀 pim-moe-core Blueprint
 
-### Bare-Metal PIM-HBM Hardware Co-Design Core Engine Eradicating NCCL All-to-All Interconnect Stalls via Register-Level MUX Virtualization (PoC)
+### Bare-Metal PIM-HBM Hardware Co-Design Core Engine Eradicating NCCL All-to-All Interconnect Stalls via Register-Level MUX Virtualization
 
 `pim-moe-core` is an experimental hardware-software co-design infrastructure prototype engineered to resolve the catastrophic collective communication overhead (`NCCL All-to-All`) inherent in hyperscale Mixture-of-Experts (MoE) architectures such as DeepSeek-V3 and Mixtral-8x7B.
 
