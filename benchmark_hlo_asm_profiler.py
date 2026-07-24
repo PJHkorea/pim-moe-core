@@ -8,39 +8,39 @@ from pim_moe_config import NUM_EXPERTS, FEATURE_DIM, BUCKET_SIZES, get_tokens_pe
 from test_e2e_pinn_moe import mock_e2e_core_pipeline_factory
 
 def compile_and_dump_pure_hlo_asm(bucket_size: int, tokens_per_expert: int, mesh: Mesh) -> str:
-    """XLA HLO IR 어셈블리 텍스트 사출 엔진 (물리 VRAM 점유 0MB)"""
+    """[XLA HLO IR ASSEMBLY TEXT EMITTER] Enforces a strict 0MB physical VRAM footprint via abstract tracing."""
     
-    # 1. 물리 메모리 점유 방지를 위한 가상 Abstract Shape 정의
+    # 1. Construct virtual abstract shape traces to guarantee 0MB physical VRAM allocation
     abstract_token_stream = jax.ShapeDtypeStruct(
         shape=(bucket_size, FEATURE_DIM), dtype=jnp.float32)
     abstract_gate_logits = jax.ShapeDtypeStruct(
         shape=(bucket_size, NUM_EXPERTS), dtype=jnp.float32)
 
-    # 2. MoE 커널 팩토리 점화
+    # 2. Instantiate downstream algebraic MoE hardware-software co-design kernel factory
     hardware_pass_kernel = mock_e2e_core_pipeline_factory(
         bucket_size=bucket_size, tokens_per_expert=tokens_per_expert)
 
-    # 3. JIT Lowering 및 HLO 텍스트 사출 (AOT Compilation)
+    # 3. Lock compilation graph via AOT compiler plane to freeze HLO IR instructions (JIT Lowering)
     with mesh:
-        # 하드웨어 최적화 그래프 형식으로 정적 변환
+        # Down-shift abstract JAX tracers into hardware-optimized static execution graph
         lowered_hlo_graph = jax.jit(hardware_pass_kernel).lower(
             abstract_token_stream, abstract_gate_logits)
         
-        # 컴파일 및 어셈블리 텍스트로 변환
+        # Compile and decode final executable into raw human-readable HLO machine bytecode text
         compiled_executable = lowered_hlo_graph.compile()
 
     return compiled_executable.as_text()
+
 
     
    
 def compile_and_dump_pure_hlo_asm(bucket_size: int, tokens_per_expert: int, mesh: Mesh) -> str:
     """
     [XLA HLO IR ASSEMBLY TEXT EMITTER]
-    실제 가속기 하드웨어 메모리를 점유하지 않고, JAX 추상 트레이서를 활용해 
-    하부 팩토리 커널의 수리물리학적 기계어 그래프를 완전한 정적 텍스트 형태로 사출합니다.
+    Leverages abstract JAX tracers to emit the downstream factory kernel's mathematical 
+    machine-code graph into raw static text without inducing physical accelerator memory overhead.
     """
-    # 1. 가속기 메모리 점유율 0MB를 달성하기 위한 추상 셰이프 구조체(Tracer Shape) 빌드
-    # [EN] Construct virtual abstract shape traces to guarantee a strict 0MB physical VRAM footprint.
+    # 1. Construct virtual abstract shape traces to guarantee a strict 0MB physical VRAM footprint
     abstract_token_stream = jax.ShapeDtypeStruct(
         shape=(bucket_size, FEATURE_DIM), 
         dtype=jnp.float32
@@ -50,31 +50,29 @@ def compile_and_dump_pure_hlo_asm(bucket_size: int, tokens_per_expert: int, mesh
         dtype=jnp.float32
     )
 
-    # 2. 검증할 하부 대수적 MUX 하드웨어 바인딩 커널 팩토리 점화
-    # [EN] Instantiate the target downstream algebraic Mux hardware-bound pipeline factory.
+    # 2. Instantiate the target downstream algebraic MUX hardware-bound pipeline factory
     hardware_pass_kernel = mock_e2e_core_pipeline_factory(
         bucket_size=bucket_size,
         tokens_per_expert=tokens_per_expert
     )
 
-    # 3. 컴파일러 그래프 락킹 (JIT Stage Lowering) 및 HLO 어셈블리 바이너리 추출
-    # [EN] Lock the compilation graph via AOT compiler plane to freeze the HLO IR instructions.
+    # 3. Lock the compilation graph via AOT compiler plane to freeze the HLO IR instructions (JIT Stage Lowering)
     with mesh:
-        # jax.jit 단일 클록 퓨전 그래프 내부로 추상 차원 바인딩 진입
+        # Inject abstract dimension bindings directly into the single-clock fused jax.jit graph
         jit_compiled_graph = jax.jit(hardware_pass_kernel)
         
-        # 하부 가속기 어셈블리로 정적 변환 다운그레이드 집행
+        # Execute lowering pass to down-shift the graph into a static accelerator assembly representation
         lowered_hlo_graph = jit_compiled_graph.lower(
             abstract_token_stream, 
             abstract_gate_logits
         )
         
-        # 최종 XLA HLO Native 이그제큐터 객체로 동결 컴파일 완수
+        # Conclude Ahead-of-Time (AOT) compilation to freeze the final XLA HLO Native executor object
         compiled_executable = lowered_hlo_graph.compile()
 
-    # 컴파일러 면베일 뒤에 숨겨진 기계어 바이트코드를 인간이 분석 가능한 순수 텍스트 형식으로 디코딩 반환
-    # [EN] Decode and emit the compiled HLO machine bytecode into raw human-readable text.
+    # Decode and emit the compiled HLO machine bytecode hidden behind the compiler veil into raw human-readable text
     return compiled_executable.as_text()
+
 
 # ====================================================================
 # [PIM-HBM ZERO-COPY HARDWARE MoE CORE INFRASTRUCTURE - V1.0]
@@ -85,11 +83,10 @@ def compile_and_dump_pure_hlo_asm(bucket_size: int, tokens_per_expert: int, mesh
 def audit_compiled_silicon_hlo_instructions(hlo_assembly_text: str) -> Dict[str, Any]:
     """
     [SILICON INSTRUCTION AUDIT FIREWALL]
-    사출된 XLA HLO 중간 표현식 바이너리 어셈블리를 텍스트 기반 정규식으로 정밀 오디팅하여,
-    하드웨어 파이프라인 스톨을 유발하는 집단 통신 및 정렬 명령어 유출 유무를 탐지합니다.
+    Performs deterministic regular expression auditing over the emitted XLA HLO intermediate 
+    representation assembly text to detect hidden collective communication or hardware serialization leaks.
     """
-    # 1. 분산 MoE 클러스터 랙 간의 물리 전송 오버헤드를 유발하는 최악의 NCCL 집단 통신 명령어 탐지 패턴
-    # [EN] Patterns for worst-case collective communication primitives causing distributed interconnect stalls.
+    # 1. Capture worst-case NCCL collective communication primitives driving inter-node interconnect stalls
     collective_comm_patterns = [
         r"all-to-all",
         r"collective-permute",
@@ -99,39 +96,37 @@ def audit_compiled_silicon_hlo_instructions(hlo_assembly_text: str) -> Dict[str,
         r"recv"
     ]
 
-    # 2. 하드웨어 워프 직렬화 정렬 렉(Latency Bubbles)을 유발하는 정렬 명령어 탐지 패턴
-    # [EN] Patterns for sorting primitives causing warp serialization and pipeline latency bubbles.
+    # 2. Capture hardware sorting primitives triggering warp serialization and pipeline latency bubbles
     sorting_patterns = [
         r"custom-call.*bitonic",
         r"sort"
     ]
 
-    # 오디팅 계측 리포트 구조체 초기화
+    # Initialize telemetry audit reporting metrics structures
     detected_comm_primitives: Dict[str, int] = {}
     detected_sorting_primitives: Dict[str, int] = {}
     
     total_comm_leaks = 0
     total_sorting_leaks = 0
 
-    # A. 집단 통신 명령어 스캔 조준 (Case-Insensitive)
+    # A. Execute case-insensitive profiling target scan over NCCL collective communication primitives
     for pattern in collective_comm_patterns:
         matches = re.findall(pattern, hlo_assembly_text, re.IGNORECASE)
         match_count = len(matches)
         detected_comm_primitives[pattern] = match_count
         total_comm_leaks += match_count
 
-    # B. 워프 정렬 명령어 스캔 조준
+    # B. Execute profiling target scan over hardware-bound sorting primitives
     for pattern in sorting_patterns:
         matches = re.findall(pattern, hlo_assembly_text, re.IGNORECASE)
         match_count = len(matches)
         detected_sorting_primitives[pattern] = match_count
         total_sorting_leaks += match_count
 
-    # C. 최종 0ns 실리콘 청정 무결성 판별 가드
-    # [EN] Compute absolute cleanliness metrics to enforce a strict branchless/communication-free profile.
+    # C. Compute absolute cleanliness metrics to enforce a strict branchless / communication-free profile
     is_silicon_clean = (total_comm_leaks == 0) and (total_sorting_leaks == 0)
 
-    # 오디팅 계측 요약 보고서 패킹
+    # Pack and seal the comprehensive infrastructure telemetry summary report
     report: Dict[str, Any] = {
         "is_clean": is_silicon_clean,
         "comm_summary": detected_comm_primitives,
@@ -142,6 +137,7 @@ def audit_compiled_silicon_hlo_instructions(hlo_assembly_text: str) -> Dict[str,
 
     return report
 
+
 # ====================================================================
 # [PIM-HBM ZERO-COPY HARDWARE MoE CORE INFRASTRUCTURE - V1.0]
 # @file: benchmark_hlo_asm_profiler.py
@@ -151,25 +147,25 @@ def audit_compiled_silicon_hlo_instructions(hlo_assembly_text: str) -> Dict[str,
 def run_hlo_static_assembly_benchmark() -> None:
     """
     [⚡ STATIC HLO VERIFICATION ORCHESTRATOR]
-    가상 가속기 분산 토폴로지를 활성화하고 컴파일러 면베일 뒤에 숨겨진 기계어 IR 어셈블리를 사출,
-    최종 실행 타임라인 내 통신 및 정렬 누수 카운트가 정확히 0개임을 영구 보증 오디팅합니다.
+    Activates the virtual accelerator sharding topology, captures the raw machine-code 
+    IR assembly hidden behind the compiler veil, and permanently audits that collective 
+    communication or sorting leakage counts remain exactly zero.
     """
     print("====================================================================")
     print("🔍 IGNITING XLA HIGH-LEVEL OPTIMIZER (HLO) ASSEMBLY PROFILER...")
     print("====================================================================")
 
-    # A. 8-way 분산 가상 메시 토폴로지 활성화 셋업
-    # [EN] Instantiate virtual 8-way accelerator device slice cluster mesh context.
+    # A. Configure and initialize the virtual distributed sharding cluster topology mesh
     devices = jax.devices()
     mock_mesh = Mesh(jnp.array(devices)[:1], ("moe_cluster",))
     print(f"[PROFILER_BOOT] Device sharding topology mesh locked: {mock_mesh}")
 
-    # B. 가변 추론 스트림용 가이드 정적 버킷 대표 규격 바인딩 (512 가드 버킷 조준)
+    # B. Bind target deterministic power-of-2 static bucket capacity for dynamic inference window mapping
     target_bucket_size = BUCKET_SIZES[3] # 512 static slots boundary
     tokens_per_expert = get_tokens_per_expert(target_bucket_size)
     print(f"[PROFILER_TARGET] Targeting dynamic inference window mapping: {target_bucket_size} slots.")
 
-    # C. [PART 1/3] XLA 로어링 엔진 가동 ➔ 순수 정적 HLO IR 텍스트 덤프 획득
+    # C. Execute XLA lowering pass over abstract JAX tracers to capture raw static HLO IR bytecode [PART 1/3]
     print(f"[COMPILING] Down-shifting abstract JAX tracers into bare-metal execution graph...")
     start_time = time.perf_counter()
     hlo_assembly_text = compile_and_dump_pure_hlo_asm(
@@ -180,18 +176,17 @@ def run_hlo_static_assembly_benchmark() -> None:
     end_time = time.perf_counter()
     print(f" ✨ [COMPILE SUCCESS] Core matrix HLO text extracted in {end_time - start_time:.4f} seconds.")
 
-    # D. 사출된 XLA 기계어 바이너리 어셈블리를 로컬 디스크에 무복사 영구 격리 덤프
-    # [EN] Dump and export the raw machine-code assembly text for permanent provenance auditing.
+    # D. Export and isolate raw compiled machine-code assembly text onto local disk for provenance auditing
     dump_filename = "fng_moe_optimized_hlo.txt"
     with open(dump_filename, "w", encoding="utf-8") as f:
         f.write(hlo_assembly_text)
     print(f" ├─ [FILE EXPORT] Assembly output permanently sealed in './{dump_filename}'.")
 
-    # E. [PART 2/3] 정규식 기반 실리콘 명령어 감시 방화벽 작동 (0카운트 영구 오디팅)
+    # E. Engage the regular expression silicon instruction audit firewall firewall for 0-count telemetry validation [PART 2/3]
     print(f"[AUDITING] Scanning HLO IR instructions for hidden collective communication or sorting spikes...")
     audit_results = audit_compiled_silicon_hlo_instructions(hlo_assembly_text)
 
-    # 텔레메트리 스캔 결과 계측 리포팅 콘솔 사출
+    # Emit the comprehensive infrastructure telemetry metrics summary into the console output plane
     print("\n====================================================================")
     print("📊 SILICON ASSEMBLY INFRASTRUCTURE AUDIT REPORT")
     print("====================================================================")
@@ -204,8 +199,7 @@ def run_hlo_static_assembly_benchmark() -> None:
         print(f" │    └─ Pattern '{primitive:20s}' ➔ Count: {count}")
     print("====================================================================")
 
-    # F. [MANDATORY INFRASTRUCTURE GUARDRAIL]: 물리적 탈옥 명령어 잔존 시 컴파일러 즉시 폭사 자폭 가드 기폭
-    # [EN] Enforce unconditional compilation barrier fence: Trigger failure if any communication primitive is leaked.
+    # F. [MANDATORY INFRASTRUCTURE GUARDRAIL]: Enforce unconditional compilation barrier fence and trigger self-destruction upon violation
     assert audit_results["is_clean"], (
         f"[🚨 SYSTEM AUDIT VIOLATION] Critical communication or sorting primitive leaked into HLO execution timeline! "
         f"Distributed 0ns zero-copy integrity broken. Check your core kernel graph."
@@ -215,9 +209,9 @@ def run_hlo_static_assembly_benchmark() -> None:
     print("====================================================================\n")
 
 # --------------------------------------------------------------------------------
-# 🎬 [MAIN ENTRANCE]: 정적 프로파일러 독립 실행 진입점 락킹
+# 🎬 [MAIN ENTRANCE]: Enforce Deterministic Execution Isolation Boundary
 # --------------------------------------------------------------------------------
 if __name__ == "__main__":
     import time
-    # 로우레벨 어셈블리 정적 오디팅 및 0카운트 영구 보증 벤치마크 전격 점화
+    # Ignite low-level assembly static auditing and 0-count zero-leak verification benchmark
     run_hlo_static_assembly_benchmark()
