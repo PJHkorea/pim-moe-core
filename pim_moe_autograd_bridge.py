@@ -1,8 +1,7 @@
-# ====================================================================
-# [PIM-HBM ZERO-COPY HARDWARE MoE CORE INFRASTRUCTURE - V1.0]
-# @file: pim_moe_autograd_bridge.py
-# [PART 1/1]: Heterogeneous Framework 0-Copy Autograd-VJP Bridging Layer
-# ====================================================================
+# ==================================================================== #
+# [PIM-HBM ZERO-COPY HARDWARE MoE CORE INFRASTRUCTURE - V1.0]          #
+# @file: pim_moe_autograd_bridge.py                                   #
+# ==================================================================== #
 
 import torch
 import jax
@@ -12,28 +11,32 @@ from jax.dlpack import to_dlpack as jax_to_dlpack
 from jax.dlpack import from_dlpack as jax_from_dlpack
 from typing import Tuple, Any
 
-# pim_moe_config의 하드웨어 사양 뱅크 연동상속
+# Inherit hardware specification bank from pim_moe_config
 from pim_moe_config import NUM_EXPERTS, FEATURE_DIM
 
 class FngMoeAutogradBridgeFunction(torch.autograd.Function):
     """
     [HYBRID FRAMEWORK INTERLOCK INTERFACE]
-    PyTorch의 C++ Autograd 실행 타임라인 환경 내부에 JAX/XLA 분산 VJP 연산 장치를
-    0바이트 복사 프로토콜(DLPack Pointer Hijacking)로 주입하는 양방향 가상화 교량입니다.
-    """
     
+    A bidirectional virtualization bridge that injects the JAX/XLA distributed VJP 
+    execution engine directly into the PyTorch C++ Autograd timeline using a 
+    zero-copy protocol (DLPack Pointer Hijacking).
+    """
+
     @staticmethod
     def forward(
-        ctx: Any, 
-        hidden_states: torch.Tensor, 
-        gate_logits: torch.Tensor, 
-        e2e_pipeline: Any, 
+        ctx: Any,
+        hidden_states: torch.Tensor,
+        gate_logits: torch.Tensor,
+        e2e_pipeline: Any,
         mesh: Any
     ) -> torch.Tensor:
         """
-        [📢 FORWARD PASS]: 파이토치 VRAM 기저 주소를 JAX 텐서 버스로 0ns만에 수입 결착
+        [FORWARD PASS]:
+        Imports and binds the PyTorch VRAM base addresses to the JAX tensor bus with zero latency.
         """
-        # [🛡️ HARDWARE ALIGNMENT CHECK]: VRAM 상의 물리 배열 연속성이 깨져 발생하는 수치 폭주 선제 차단
+        # [HARDWARE ALIGNMENT CHECK]: 
+        # Enforce physical memory continuity in VRAM to preemptively prevent numerical explosion.
         if not hidden_states.is_contiguous():
             hidden_states = hidden_states.contiguous()
         if not gate_logits.is_contiguous():
@@ -42,47 +45,52 @@ class FngMoeAutogradBridgeFunction(torch.autograd.Function):
         ctx.e2e_pipeline = e2e_pipeline
         ctx.mesh = mesh
 
-        # [🔒 0-COPY POINTER HIJACKING]: DLPack 표준 규격을 통해 물리 메모리 복제 버블을 영구 박멸
-        # PyTorch가 소유한 가속기 주소선을 JAX 디바이스 어레이로 무복사 직통 전사합니다.
+        # [ZERO-COPY POINTER HIJACKING]: 
+        # Eliminate physical memory duplication overhead via the DLPack standard spec.
+        # Direct-map the accelerator address lines owned by PyTorch into JAX DeviceArrays.
         jax_tokens = jax_from_dlpack(to_dlpack(hidden_states))
         jax_logits = jax_from_dlpack(to_dlpack(gate_logits))
 
-        # [🌀 JAX VJP ENGINE LAUNCH]: 정방향 출력 사출과 동시에 역방향용 미분 주소선(_e2e_vjp_fn) 박제
+        # [JAX VJP ENGINE LAUNCH]: 
+        # Compute forward pass outputs while capturing the gradient address paths (_e2e_vjp_fn) for the backward pass.
         with mesh:
             jax_outputs, e2e_vjp_fn = jax.vjp(
-                lambda h, g: e2e_pipeline(h, g), 
-                jax_tokens, 
+                lambda h, g: e2e_pipeline(h, g),
+                jax_tokens,
                 jax_logits
             )
+
             
-        # [🔒 EXTENDED LIFE-CYCLE GUARD]: 비동기 가비지 컬렉터(GC)의 조기 주소 파손을 방어하기 위한 컨텍스트 보존
+              # [🔒 EXTENDED LIFE-CYCLE GUARD]: 
+        # Preserve context to safeguard against premature memory reclamation by the asynchronous Garbage Collector (GC).
         ctx.e2e_vjp_fn = e2e_vjp_fn
         ctx.save_for_backward(hidden_states, gate_logits)
 
-        # 정제 완결된 JAX 아웃풋을 다시 파이토치 VRAM 힙 공간으로 0바이트 무복사 회수
+        # Reclaim the finalized JAX output back into the PyTorch VRAM heap space via 0-byte zero-copy.
         torch_outputs = from_dlpack(jax_to_dlpack(jax_outputs))
         return torch_outputs
 
     @staticmethod
     def backward(ctx: Any, grad_output: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, None, None]:
         """
-        [📢 BACKWARD PASS]: 단열 백프로파게이션 터널(Adiabatic Backpropagation Tunnel) 가동
+        [BACKWARD PASS]:
+        Activates the Adiabatic Backpropagation Tunnel for gradient computation.
         """
         if not grad_output.is_contiguous():
             grad_output = grad_output.contiguous()
 
-        # 정방향에서 박제해 둔 VJP 기계어 주소선과 파이토치 상류의 오차 행렬 로드
+        # Load the VJP compiled execution handles and the upstream PyTorch error matrix.
         e2e_vjp_fn = ctx.e2e_vjp_fn
         mesh = ctx.mesh
         
-        # 입력 오차 행렬을 0-copy 하이재킹하여 XLA VJP 융합 선로로 조준 투하
+        # Hijack the incoming gradient matrix via zero-copy and inject it into the XLA VJP fused pipeline.
         jax_grad_output = jax_from_dlpack(to_dlpack(grad_output))
 
-        # XLA VJP 역산 관류를 기폭하여 토큰과 게이팅 로짓의 그라디언트를 누수(NaN) 없이 산출
+        # Trigger the XLA VJP backward flow to compute gradients for tokens and gate logits without numerical leaks (NaN).
         with mesh:
             grad_hidden, grad_logits = e2e_vjp_fn(jax_grad_output)
 
-        # 연산 대상이 아닌 인자축(e2e_pipeline, mesh)에 맞춰 명시적 None 매칭 반환 규격 준수
+        # Convert back via zero-copy and adhere to PyTorch autograd spec by returning None for non-differentiable arguments (e2e_pipeline, mesh).
         torch_grad_hidden = from_dlpack(jax_to_dlpack(grad_hidden))
         torch_grad_logits = from_dlpack(jax_to_dlpack(grad_logits))
 
@@ -92,14 +100,15 @@ class FngMoeAutogradBridgeFunction(torch.autograd.Function):
 class PimMoeAutogradBridge:
     """
     [HIGH-LEVEL CO-DESIGN WRAPPER]
-    실제 모델 레이어 인젝션 단에서 호출하기 용의하도록 캡슐화 플러그인 팩토리 인터페이스를 제공합니다.
+    Provides an encapsulated plugin factory interface designed for seamless injection 
+    at the actual model layer execution stage.
     """
     def __init__(self, e2e_pipeline: Any, mesh: Any):
         self.e2e_pipeline = e2e_pipeline
         self.mesh = mesh
 
     def __call__(self, hidden_states: torch.Tensor, gate_logits: torch.Tensor) -> torch.Tensor:
-        # 정방향/역방향 단열 자동미분 관로 기폭 실행
+        # Trigger the execution of the forward/backward adiabatic automatic differentiation pipeline
         return FngMoeAutogradBridgeFunction.apply(
             hidden_states, 
             gate_logits, 
