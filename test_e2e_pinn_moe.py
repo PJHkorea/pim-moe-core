@@ -146,6 +146,23 @@ def mock_e2e_core_pipeline_factory(bucket_size: int, tokens_per_expert: int):
     return _fused_xla_hardware_bound_pass
 
 
+# ====================================================================
+# [MANDATORY HARDWARE PROFILING PROTOCOL]: TWO-STAGE INTERLOCK VERIFICATION
+# 
+# This execution suite intentionally isolates the test routine into two sequential stages:
+#
+# Stage 1 (Verification Gate): 
+# Invokes an initial pass to trigger JAX/XLA Ahead-of-Time (AOT) compilation and 
+# pre-warm the static memory blocks, effectively absorbing all one-time JIT compilation latency.
+#
+# Stage 2 (Multi-Node Telemetry): 
+# Executes the main benchmark loop on an already warmed-up hardware plane. This ensures 
+# that time.perf_counter() measures pure 0ns kernel-swapping and matrix flow latency, 
+# completely free from compiler-induced profiling artifacts.
+# ====================================================================
+
+
+
 # --------------------------------------------------------------------------------
 # [PART 3/3]: Test Execution Routine & Verification Gate
 # --------------------------------------------------------------------------------
